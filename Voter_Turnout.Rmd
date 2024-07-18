@@ -1,0 +1,664 @@
+---
+title: "Predictive Modeling for Voter Turnout in the US Presidential Elections 2024"  
+
+author: "Sneha Mariam Thomas"
+
+output:
+  html_document
+---
+```{r ref.label=knitr::all_labels(), echo=FALSE, eval=FALSE} 
+# this chunk generates the complete code appendix. 
+# eval=FALSE tells R not to run (``evaluate'') the code here (it was already run before).
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, cache = TRUE, fig.align="center")
+```
+&nbsp;
+
+#### __Introduction__  
+
+Accurately predicting voter turnout plays a crucial role in enhancing inclusive democratic representation. By identifying segments of the electorate who are less likely to participate in elections, we can effectively target outreach efforts. This targeted approach promotes broader civic engagement by addressing barriers that prevent certain groups from voting. In doing so, we strengthen the democratic process by ensuring that all voices are heard and represented in our electoral system. This proactive strategy not only encourages higher voter participation but also fosters a more inclusive and responsive democracy that reflects the diverse perspectives and interests of the population.  
+
+The project's primary objective is to construct a predictive model for individual voter turnout in the upcoming November presidential election in the United States. Leveraging data from the Harvard Cooperative Congressional Election Study (CCES) for training, the model aims to accurately forecast whether voters will participate in the election. This predictive capability is crucial for targeting outreach efforts effectively towards individuals who are less likely to vote. By doing so, the project seeks to increase overall voter turnout, promote broader civic engagement, and ensure that election outcomes more faithfully represent the preferences of the entire electorate.  
+
+&nbsp;
+
+#### __Data Source__  
+
+The CCES dataset explores American perceptions of electoral accountability, voting behavior, and electoral experiences, investigating variations across political geography and social contexts. Administered online by YouGov, the 2022 CCES survey involved interviews with 60,000 adults between September and November 2022. This extensive dataset collects crucial pre-election data through a standardized questionnaire, ensuring contemporary insights essential for precise turnout predictions in 2024. Analyzing its comprehensive array of pre-election variables facilitates targeted outreach efforts aimed at potential non-voters.
+
+For a comprehensive understanding of the survey questions and detailed dataset information, please consult the following [link](https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi%3A10.7910/DVN/PR4L8P). 
+Question _CC22_363_ has been utilized as a proxy to gauge 2024 voting intention, drawing on responses obtained in 2022. Responses categorized as 1, 3, and 4 denote a strong commitment and have been classified as "Will Vote (0)". Responses categorized as 2, 5, and 6, indicating uncertainty or disinterest, have been categorized as "No (1)".  
+&nbsp;
+
+#### __Feature Engineering__  
+
+- __Feature Selection__: The model development process aimed to simplify variables while preserving predictive power. For example, detailed variables like specific church affiliations were removed to reduce complexity. Instead, broader indicators such as respondents' religion were retained to capture essential aspects of religious identity affecting voter turnout. This approach resulted in 118 variables being retained for analysis, after evaluating and removing other variables based on their relevance and granularity.  
+
+- __Missing Values__: Addressing missing data challenges in this research, the implementation of the _Multiple Imputation by Chained Equations (MICE)_ method was crucial. MICE utilizes a predictive mean matching algorithm to iteratively impute missing values, making it well-suited for datasets with non-random missingness and complex variable relationships. By leveraging observed data, MICE generates multiple imputations that preserve the integrity of the original data distribution. This approach was pivotal due to significant missing values in the dataset and the need to accurately capture variable interdependencies during imputation. MICE's ability to simulate realistic values based on observed patterns ensured imputations aligned closely with the dataset's structure. Methodologically, MICE's iterative approach enabled systematic handling of missing data, maintaining statistical power and reducing bias in the analyses. Integration of multiple imputations enhanced the reliability and completeness of findings, thereby reinforcing the study's validity.  
+
+- __Categorical Variable Encoding__: All variables except birth year were categorical and subsequently underwent one-hot encoding, while birth year was transformed into age.Transforming categorical columns through one-hot encoding captures categorical data as binary vectors, preserving their distinct values as individual features for analysis.
+
+&nbsp;
+
+#### __Modelling Strategies__  
+
+- __Algorithm Selection__: The adoption of XGBoost and Ranger for model development is underpinned by their proven efficacy and pragmatic utility in handling complex datasets. XGBoost, rooted in gradient boosting principles, iteratively minimises a differentiable loss function to optimise model performance, providing resilience against overfitting and facilitating feature selection. In contrast, Ranger, an extension of Random Forests, leverages ensemble learning to address variance and bias issues, ensuring stable and accurate predictions. Importantly, for a 60,000 observations with 121 features and class imbalance, these models offer scalability, robustness, and the capacity to handle high-dimensional data effectively.  
+
+- __Handling Class Imbalance__: The dataset exhibited a pronounced class imbalance with a greater number of voter instances compared to non-voters. To address this issue in the XGBoost model, the _scale_pos_weight_ parameter was utilized. By setting scale_pos_weight = ratio, where ratio represents the ratio of negative (non-voter) to positive (voter) class samples in the dataset, XGBoost assigns a higher weight to the minority class (non-voters) during training. This adjustment helps the model to focus more on learning patterns that differentiate non-voters from voters, thereby improving its ability to correctly classify both classes despite the skewed distribution in the dataset. The scale_pos_weight parameter effectively mitigates the bias towards the majority class and enhances the model's performance by ensuring that predictions are more balanced and reflective of the actual class distribution, leading to more accurate insights and decisions based on the data.      
+
+- __Data Weighting__: “Commonweight",within the dataset, refers to predetermined weights assigned to individual observations, ensuring representativeness of adult Americans' opinions and behaviours. By integrating weights into training, accurate representation of diversity is ensured, enhancing predictive accuracy and reliability in predictions, across the population.  
+
+- __Dataset Partitioning and Missing Value Imputation__: Dataset was partitioned into a training set consisting of 48,000 observations and a test set containing 12,000 observations. Subsequently, MICE was performed to address the missing values in the data. Imputing missing values separately in each respective set ensures the integrity of the test set as an independent validation sample. This approach aligns with real-world scenarios where predictions are made on new, unseen data with missing values, preventing any information leakage from the test set. It contributes to maintaining the validity and generalizability of the model's performance metrics during evaluation.
+
+- __Hyperparameter Tuning__: Hyperparameter tuning involves refining parameters that influence how machine learning models learn, aiming to improve their performance. In this study, it was applied to XGBoost and Ranger to optimize settings like learning rates and the number of estimators for XGBoost, and the number of trees for Ranger. The choice of Receiver Operating Characteristic - Area Under the Curve (ROC-AUC) score as the evaluation metric was deliberate for its effectiveness in distinguishing between classes, especially valuable in scenarios with class imbalance, such as accurately predicting non-voters in this context.
+
+&nbsp;
+
+
+#### __Model Evaluation__
+
+Metrics for model comparison are as follows:
+
+```{r,message=FALSE,warning=FALSE, echo=FALSE}
+#Loading Libraries
+library(ranger)
+library(caret)
+library(pROC)
+library(ranger)
+library(doParallel)
+library(mlr)
+library(tuneRanger)
+library(xgboost)
+library(caTools)
+library(dplyr)
+library(cvms)
+library(caret)
+library(tidyverse)
+library(Metrics)
+library(MLmetrics)
+library(gridExtra)
+library(knitr)
+library(ggplot2)
+library(kableExtra)
+require(doMC)
+library(htmltools)
+library(SHAPforxgboost)
+library(data.table)
+library(here)
+
+data <- read.csv("C:/Users/sneha/OneDrive/Desktop/Applied ML/Assessments/Summative 2/data/CCES22_Common_OUTPUT_vv_topost.csv")
+copy_data <- data
+output <- data$CC22_363
+#Pre election dataset
+df <- data[, 1:332]
+del_columns <- c("X","commonpostweight","vvweight","vvweight_post","caseid","tookpost", "CCEStake", "add_confirm", "inputzip", "gender4_t", "race_other", "multrace_1", "multrace_2", "multrace_3", "multrace_4", "multrace_5", "multrace_8", "multrace_97", "multrace_98", "comptype", "regzip", "pid3_t", "ccesmodule", "CC22_309a_1", "CC22_309a_2", "CC22_309a_3", "CC22_309a_4", "CC22_309a_5", "CC22_306", "CC22_309b_1", "CC22_309b_2", "CC22_309b_3", "CC22_309b_4", "CC22_309d_t", "CC22_310a", "CC22_310b", "CC22_310c", "CC22_310d", "CC22_311a", "CC22_311b", "CC22_311c", "CC22_311d", "cit1", "CC22_321_1", "CC22_321_2", "CC22_321_3", "CC22_321_4", "CC22_321_5", "CC22_321_6", "CC22_321_7", "CC22_321_8", "CC22_327a", "CC22_327b", "CC22_327c", "CC22_327d", "CC22_330a", "CC22_330b", "CC22_330c", "CC22_330d", "CC22_330e", "CC22_330f", "CC22_331a", "CC22_331b", "CC22_331c", "CC22_331d", "CC22_332a", "CC22_332b", "CC22_332c", "CC22_332d", "CC22_332e", "CC22_332f", "C22_333a", "C22_333b", "C22_333c", "C22_333d", "C22_333e", "C22_334a", "C22_334b", "C22_334c", "C22_334d", "C22_334e", "C22_334f", "C22_334g", "C22_334h", "CC22_340c", "CC22_340d", "CC22_340e", "CC22_340f", "CC22_340h", "CC22_340i", "CC22_340j", "CC22_340k", "CC22_340l", "CC22_340m", "CC22_340n", "urbancity_t", "CC22_363", "CC22_365_voted", "CC22_365_voted_t", "CC22_365b_voted", "CC22_365b_voted_t", "CC22_366_voted", "CC22_366_voted_t", "CC22_367_voted", "CC22_367_voted_t", "CC22_365", "CC22_365_t", "CC22_365a", "CC22_365a_t", "CC22_365b", "CC22_365b_t", "CC22_365c", "CC22_365c_t", "CC22_366", "CC22_367_t", "CC22_367a", "CC22_367a_t", "employ_t", "pew_churatd", "pew_prayer", "religpew_t", "religpew_protestant", "religpew_protestant_t", "religpew_baptist", "religpew_baptist_t", "religpew_methodist_t", "religpew_nondenom", "religpew_nondenom_t", "religpew_lutheran", "religpew_lutheran_t", "religpew_presby", "religpew_presby_t", "religpew_pentecost", "religpew_pentecost_t", "religpew_episcop", "religpew_episcop_t", "religpew_christian", "religpew_christian_t", "religpew_congreg", "religpew_congreg_t", "religpew_holiness", "religpew_holiness_t", "religpew_reformed", "religpew_reformed_t", "religpew_advent", "religpew_advent_t", "religpew_catholic", "religpew_catholic_t", "religpew_mormon", "religpew_mormon_t", "religpew_orthodox", "religpew_orthodox_t", "religpew_jewish", "religpew_jewish_t", "religpew_muslim", "religpew_muslim_t", "religpew_buddhist", "religpew_buddhist_t", "religpew_hindu", "religpew_hindu_t", "dualctry", "ownhome_t", "healthins2", "phone", "internethome", "internetwork", "CC22_hisp_t","CC22_asian_t","presvote16post", "presvote16post_t", "industry", "child18num", "CC22_350a", "CC22_350a", "CC22_350b", "CC22_350c", "CC22_350d", "CC22_350e", "CC22_350f", "CC22_350g", "CC22_350h", "CC22_355a", "CC22_355b", "CC22_355c", "CC22_355d", "CC22_355e", "religpew_methodist", "CC22_hisp_1", "CC22_hisp_2", "CC22_hisp_3", "CC22_hisp_4", "CC22_hisp_5", "CC22_hisp_6", "CC22_hisp_7", "CC22_hisp_8", "CC22_hisp_9", "CC22_hisp_10", "CC22_hisp_11", "CC22_hisp_12", "CC22_asian_1", "CC22_asian_2", "CC22_asian_3", "CC22_asian_4", "CC22_asian_5", "CC22_asian_6", "CC22_asian_7", "CC22_asian_8", "CC22_asian_9", "CC22_asian_10", "CC22_asian_11", "CC22_asian_12", "CC22_asian_13", "CC22_asian_14", "CC22_asian_15")
+df <- df[, !names(df) %in% del_columns]
+df <- df[, -grep("CC22_300b", names(df))]
+df <- df[, -grep("CC22_360", names(df))]
+df <- df[, -grep("hadjob", names(df))]
+
+
+#Removing columns where people could input text in 'Other' option
+col_remove_text <- grep(".*_t", names(df))
+# Remove columns
+df <- df[, !(names(df) %in% names(df)[col_remove_text])]
+df_final <- df
+
+#Putting None for people who werent presented question and putting it as new columns
+df_final$CC22_300a[df_final$CC22_300_2 != 1 & is.na(df_final$CC22_300a)] <- "None"
+df_final$CC22_300c[df_final$CC22_300_3 != 1 & is.na(df_final$CC22_300c)] <- "None"
+df_final$CC22_300d_7[df_final$CC22_300_1 == 2 & is.na(df_final$CC22_300d_1) & is.na(df_final$CC22_300d_2) & is.na(df_final$CC22_300d_3) & is.na(df_final$CC22_300d_4) & is.na(df_final$CC22_300d_5) & is.na(df_final$CC22_300d_6)] <- 1
+df_final$CC22_300d_7[is.na(df_final$CC22_300d_7)] <- 2
+
+# From year of birth to age
+names(df_final)[names(df_final) == "birthyr"] <- "age"
+df_final$age <- 2022 - df_final$age
+
+#Factorise
+df_final[,3:121] <- lapply(df_final[,3:121], factor)
+dfs<- as.data.frame(df_final)
+
+#Since state column has many inputs removed
+df_nostate <- dfs[,-grep("inputstate", names(dfs))]
+
+#Output and Weight
+df_ot_wt <- copy_data[, c("CC22_363", "commonweight")]
+
+# CHanging outputs to vote or not vote-> Factor
+df_ot_wt$CC22_363[df_ot_wt$CC22_363 == 1 | df_ot_wt$CC22_363 == 3 | df_ot_wt$CC22_363 == 4] <- 0
+df_ot_wt$CC22_363[df_ot_wt$CC22_363 == 2 | df_ot_wt$CC22_363 == 5 | df_ot_wt$CC22_363 == 6 | is.na(df_ot_wt$CC22_363)] <- 1
+df_ot_wt$CC22_363 <- as.factor(df_ot_wt$CC22_363)
+
+#COmprises the outfut as factor and all dataset except states name
+main_data <- cbind(df_nostate, df_ot_wt$CC22_363)
+#Ensuring column name matches
+colnames(main_data)[colnames(main_data) == "df_ot_wt$CC22_363"] <- "CC22_363"
+
+
+#Split to Train and Test
+set.seed(123)
+train_index <- sort(sample(1: nrow(main_data), floor(0.8*nrow(main_data))))
+datas <- list(train_data  = main_data[train_index,],
+             test_data  = main_data[-train_index,],
+             target_name = "CC22_363")
+
+### SOURCE FOR FOLLOWING FUNCTIONS OF MICE: https://rmisstastic.netlify.app/how-to/external/how_to_predict_in_r
+#NOTE: Given time to run code took 4hrs+, the resulst were stored as .csv file for subsequent use and faster knitting of R Markdown
+
+#imputation_fun_mice <- function(df){
+  #init <- mice(df, maxit=0, remove.collinear = FALSE, remove.constant = FALSE)
+  #meth <- init$method
+  #predM <- init$predictorMatrix
+  #imputed <- mice(df, method=meth, predictorMatrix=predM, m=5, nnet.MaxNWts = 5000, remove.collinear = FALSE, remove.constant = FALSE, maxit = 1)
+  #completed <- mice::complete(imputed)
+  #return(completed)
+#}
+
+#get_imputed_data <- function(data, imputed_function){
+  #train <- datas$train_data[, -c(which(colnames(datas$train_data) ==datas$target_name))]
+  #test <- datas$test_data[, -c(which(colnames(datas$test_data) ==datas$target_name))]
+  #expr_time <- system.time({
+    #imputed_data <- lapply(list(train, test), imputed_function)
+  #})
+  
+  #names(imputed_data) <- c('train_data', 'test_data')
+  #imputed_data$train_data <- cbind(imputed_data$train_data, datas$train_data[, datas$target_name] )
+  #imputed_data$test_data <- cbind(imputed_data$test_data, datas$test_data[, datas$target_name] )
+  
+  #colnames(imputed_data$train_data)[ncol(imputed_data$train_data ] <- datas$target_name
+  #colnames(imputed_data$test_data)[ncol(imputed_data$test_data)] <- datas$target_name
+  
+  #return(list(imputed_data = imputed_data,
+              #target_name = datas$target_name,
+              #time = expr_time))}
+
+#imputed_results_mice <- get_imputed_data(datas, imputation_fun_mice)
+
+#Saving the results
+#write.csv(imputed_results_mice$imputed_data$train_data, "train_mice.csv")
+#write.csv(imputed_results_mice$imputed_data$test_data, "test_mice.csv")
+
+imputed_train <- read.csv("C:/Users/sneha/OneDrive/Desktop/Applied ML/Assessments/Summative 2/data/train_mice.csv")[,-1]
+imputed_test <- read.csv("C:/Users/sneha/OneDrive/Desktop/Applied ML/Assessments/Summative 2/data/test_mice.csv")[,-1]
+
+imputed_train[,3:121] <- as.data.frame(lapply(imputed_train[,3:121], as.factor))
+imputed_test[,3:121] <- as.data.frame(lapply(imputed_test[,3:121], as.factor))
+
+#One Hot Encoding: TRAIN
+#Some variables are already hot encoded
+dummy <- imputed_train[,grep("(\\w+_\\d{1,2}$)|(CC22_363)",names(imputed_train))]
+train_ne <- imputed_train[, !(names(imputed_train) %in% names(dummy))]
+#Adding states as they also have to be hot encoded
+train_ne <- cbind(train_ne, dfs$inputstate[train_index])
+#Hot encoding to all except weight
+train_encoded <- as.data.frame(model.matrix(~ . - 1, data = train_ne))
+
+# Converting 
+# Change columns into numeric, except the target column
+dummy[,1:54] <- as.data.frame(lapply(dummy[,1:54], as.numeric))
+dummy[,1:54][dummy[,1:54] == 2] <- 0
+# Change back to factor
+dummy[,1:54] <- as.data.frame(lapply(dummy[,1:54], as.factor))
+train_final <- cbind(train_encoded, dummy)
+train_final[,3:ncol(train_final)] <- lapply(train_final[,3:ncol(train_final)], factor)
+#Cleaning column names of states encoded
+state_col <- colnames(train_final)[237:286]
+state_number <- gsub("`dfs\\$inputstate\\[train_index\\]`", "", state_col)
+new_state_names <- paste0("inputstate_", state_number)
+colnames(train_final)[237:286] <- new_state_names
+
+#ONE HOT ENCODING: TEST
+test_dummy <- imputed_test[, grep("(\\w+_\\d{1,2}$)|(CC22_363)", names(imputed_test))]
+test_ne <- imputed_test[, !(names(imputed_test) %in% names(test_dummy))]
+#COlumn in train data baut not test
+test_ne$CC22_3677 <- 0
+test_ne <- cbind(test_ne,dfs$inputstate[-train_index])
+test_encoded <- as.data.frame(model.matrix(~ . - 1, data = test_ne))
+test_dummy[,1:54] <- as.data.frame(lapply(test_dummy[,1:54], as.numeric))
+test_dummy[,1:54][test_dummy[,1:54] == 2] <- 0
+# Change back to factor
+test_dummy[,1:54] <- as.data.frame(lapply(test_dummy[,1:54], as.factor))
+test_final <- cbind(test_encoded, test_dummy)
+test_final[,3:ncol(test_final)] <- lapply(test_final[,3:ncol(test_final)], factor)
+state_names <- colnames(test_final)[237:286]
+state_col <- gsub("`dfs\\$inputstate\\[-train_index\\]`", "", state_names)
+new_state_names <- paste0("inputstate_", state_col)
+colnames(test_final)[237:286] <- new_state_names
+
+#XGBOOST
+column_index_to_exclude <- which(colnames(train_final) == "CC22_363")
+train_x <- train_final[,-column_index_to_exclude]
+train_y <- train_final$CC22_363
+train_y <- as.numeric(as.character(train_y))
+train_weights <- train_final$commonweight
+train_x <- train_x[,-1]
+train_x[, -1] <- lapply(train_x[, -1], function(x) as.numeric(as.character(x)))
+
+
+col_to_exclude <- which(colnames(test_final) == "CC22_363")
+test_x <- test_final[,-col_to_exclude]
+test_y <- test_final$CC22_363
+test_y <- as.numeric(as.character(test_y))
+test_weights <- test_final$commonweight
+test_x <- test_x[,-1]
+test_x[, -1] <- lapply(test_x[, -1], function(x) as.numeric(as.character(x)))
+
+#XGBOOST
+ratio <- sum(train_y == 0)/sum(train_y == 1)
+
+train_matrix <- model.matrix(~., data = train_x)
+test_x_add <- as.numeric(as.character(test_x$CC22_3677))
+test_x_add_matrix <- matrix(test_x_add, ncol = 1)
+test_x <- test_x[, -which(names(test_x) == "CC22_3677")]
+test_matrix <- model.matrix(~., data = test_x)
+test_matrix <- cbind(test_matrix, test_x_add_matrix) 
+colnames(test_matrix)[340] <- "CC22_3677"
+
+# Subset test_matrix to reorder its columns based on train_matrix's column order
+column_order <- colnames(train_matrix)
+test_matrix_reordered <- test_matrix[, column_order]
+
+#Removing intercept from matrix creation
+train_matrix <- train_matrix[,-1]
+test_matrix_reordered <- test_matrix_reordered[,-1]
+
+
+xgb_train <- xgb.DMatrix(data = train_matrix, label = train_y, weight = train_weights)
+xgb_test <- xgb.DMatrix(data = test_matrix_reordered, label = test_y )
+
+### HYPER PARAMTER TUNING DONE IN PYTHON DUE TO CRASH ISSUES IN R
+###_____________________________________________________________________
+#SOURCE: https://www.analyticsvidhya.com/blog/2016/03/complete-guide-parameter-tuning-xgboost-with-codes-python/
+#Function Used to tune:
+#from xgboost import XGBClassifier
+#from sklearn import metrics
+#import matplotlib.pyplot as plt
+
+#target= 'x'
+
+#def modelfit(alg, dtrain, predictors, weights=None, useTrainCV=True, cv_folds=5, early_stopping_rounds=50):
+  
+  #if useTrainCV:
+  #xgb_param = alg.get_xgb_params()
+  #xgtrain = xgb.DMatrix(dtrain[predictors].values, label=dtrain[target].values, weight=weights)
+  #cvresult = xgb.cv(xgb_param, xgtrain, num_boost_round=alg.get_params()['n_estimators'], nfold=cv_folds,
+                  #metrics='auc', early_stopping_rounds=early_stopping_rounds)
+  #alg.set_params(n_estimators=cvresult.shape[0])
+  #best_iteration_index = cvresult['test-auc-mean'].idxmax()
+
+  # Print CV results
+  #print("CV Results:")
+  #print(cvresult)
+  #print("\nBest Iteration: ", best_iteration_index)
+
+  # Fit the algorithm on the data
+  #alg.fit(dtrain[predictors], dtrain[target], sample_weight=weights, eval_metric='auc')
+
+  # Predict training set
+  #dtrain_predictions = alg.predict(dtrain[predictors])
+  #dtrain_predprob = alg.predict_proba(dtrain[predictors])[:,1]
+
+  # Print model report
+  #print ("\nModel Report")
+  #print ("Accuracy : %.4g" % metrics.accuracy_score(dtrain[target].values, dtrain_predictions))
+  #print ("AUC Score (Train): %f" % metrics.roc_auc_score(dtrain[target], dtrain_predprob))
+
+  #feat_imp = pd.Series(alg.feature_importances_, index=predictors).sort_values(ascending=False)
+  #feat_imp.plot(kind='bar', title='Feature Importances')
+  #plt.ylabel('Feature Importance Score')
+
+#train = pd.concat([train_x, train_y], axis=1)
+#train = pd.concat([train, train_weights], axis=1) 
+#predictors = train_x.columns.tolist()
+#________________________________________________________________________________
+
+#Based on above hyperparamter tuning following values were determined:
+
+#Given the time taken to run the following code and susbequent lag in knitting file,
+#following code has been commented:
+
+xgb_params <- list(
+  objective = "binary:logistic",
+  eval_metric = "auc",
+  eta = 0.01,
+  max_depth = 4,
+  min_child_weight = 3,
+  gamma = 0.1,
+  subsample = 0.7,
+  colsample_bytree = 0.8,
+  reg_alpha = 6,
+  nthread = 6,
+  scale_pos_weight = ratio)
+
+#Training XGB MODEL AND SAVING IT FOR FURTHER USE
+#xgb_model <- xgb.train(
+ #params = xgb_params,
+ #data = xgb_train,
+ #verbose = 1,
+ #nrounds = 5000,
+ #set.seed(123))
+#xgb.save(xgb_model, 'xgb_final.model')
+
+xgb_model <- xgb.load("C:/Users/sneha/OneDrive/Desktop/Applied ML/Assessments/Assignment/xgb_final.model")
+result <- predict(xgb_model, xgb_test)
+
+xgb_pred <- ifelse(result>0.5,1,0)
+conf_mat_xg<- confusionMatrix(as.factor(xgb_pred),as.factor(test_y), positive = "1")
+accuracy_xg <- (conf_mat_xg$overall["Accuracy"])
+precision_xg <- (conf_mat_xg$byClass["Pos Pred Value"])
+recall_xg <- (conf_mat_xg$byClass["Sensitivity"])
+f1_score_xg <- (2*precision_xg*recall_xg)/sum(precision_xg,recall_xg)
+logloss_xg <- logLoss(as.numeric(test_y), as.numeric(result))
+pr_auc_xg <- PRAUC(result,test_y)
+
+
+#AREA UNDER CURVE
+#roc_xg <- roc(as.factor(test_y), result)
+#auc_xg <- auc(roc_xg)
+#par(pty="s")
+#plot(roc_xg, col = "blue", lwd = 2, main = "ROC Curve:XGBOOST",legacy.axes= TRUE,print.auc=TRUE)
+
+metric_names_xg <- c( "Recall", "F1 Score","PR-AUC","Accuracy", "Precision","Log Loss")
+metric_values_xg <- c(recall_xg, f1_score_xg,pr_auc_xg, accuracy_xg, precision_xg,logloss_xg)
+metrics_df_xg  <- data.frame(Metric = metric_names_xg ,Value = metric_values_xg )
+rownames(metrics_df_xg ) <- NULL
+
+
+
+#RANGER
+
+ra_trainx <- as.data.frame(train_matrix)
+ra_testx <- as.data.frame(test_matrix_reordered)
+ra_weights <- train_weights
+ra_testy <- as.numeric(as.character(test_y))
+ra_trainy <- as.numeric(as.character(train_y))
+
+#For class imbalance
+class_0 <-  sum(ra_trainy == 0)
+class_1 <- sum(ra_trainy==1)
+ra_tot <- nrow(ra_trainx)
+weight0 <- ra_tot/(2*class_0)
+weight1 <- ra_tot/(2*class_1)
+
+ra_train <- cbind(as.factor(ra_trainy),ra_trainx)
+colnames(ra_train)[1] <- "vote_int"
+ra_test <- cbind(as.factor(ra_testy),ra_testx)
+colnames(ra_test)[1] <- "vote_int"
+
+#HYPERPARAMETER TUNING: RANGER
+# Create training and testing tasks
+#library(mlr)
+#train_task <- makeClassifTask(data = ra_train, target = "vote_int", weights = ra_weights)
+#test_task <- makeClassifTask(data = ra_test, target = "vote_int")
+
+# Create a ranger learner
+#ranger <- makeLearner("classif.ranger", predict.type = "prob", fix.factors.prediction = TRUE, par.vals = list(num.trees = 1000, importance = "permutation", replace = FALSE, scale.permutation.importance = TRUE, respect.unordered.factors='order', mtry = 18, sample.fraction = 0.5))
+
+# Set the parameters for ranger
+#rfparam_ranger <- makeParamSet(
+  #makeIntegerParam("num.trees", lower = 100, upper = 0.01*nrow(ra_train)),
+  #makeIntegerParam("mtry", lower = 18, upper = 0.4 *(ncol(ra_train)-1)),
+  #makeDiscreteParam("sample.fraction", values = c(0.5, 0.65, 0.7,0.75,0.8)),
+  #makeDiscreteParam("importance", values = c("permutation", "impurity")),
+  #makeDiscreteParam("respect.unordered.factors", values = c("order", "ignore"))
+#)
+
+# Set the control parameters
+#ctrl_ra <- makeTuneControlRandom(maxit = 10L)
+
+# Set the cross-validation  parameters
+#set_cv_ra <- makeResampleDesc("CV", iters = 3L)
+
+#Parallelize the process
+#doParallel::registerDoParallel()
+
+# Tune the ranger parameters
+#ra_tune <- tuneParams(learner = ranger, task = train_task, resampling = set_cv_ra, par.set = rfparam_ranger, control = ctrl_ra, measures = list(auc, mmce))
+
+#Based on parameters selected
+
+#doParallel::registerDoParallel()
+#ranger_model <- ranger::ranger(vote_int ~ ., data = ra_train, num.trees = 1000,
+                               #importance = "permutation", replace = FALSE, scale.permutation.importance = TRUE,
+                               #respect.unordered.factors='ignore', mtry = 40, sample.fraction = 0.7, 
+                               #seed = 123, num.threads = 6, write.forest = TRUE,
+                               #probability = TRUE, case.weights = ra_weights, 
+                               #class.weights = c("0" =weight0, "1" = weight1))
+
+ranger_model <- readRDS("C:/Users/sneha/OneDrive/Desktop/Applied ML/Assessments/Assignment/ranger_model.rds")
+ranger_pred <- predict(ranger_model, data = ra_test, type = "response")
+
+ranger_prob_mat <- ranger_pred$predictions
+ranger_prob_class1 <- ranger_prob_mat[, "1"]
+ranger_pred <- ifelse(ranger_prob_mat[, "1"] > 0.5, 1, 0)
+
+#Confusion Matrix
+conf_mat_ranger <- confusionMatrix(as.factor(ranger_pred), as.factor(ra_testy),positive="1")
+accuracy_ranger <- (conf_mat_ranger$overall["Accuracy"])
+precision_ranger <- (conf_mat_ranger$byClass["Pos Pred Value"])
+recall_ranger <- (conf_mat_ranger$byClass["Sensitivity"])
+f1_score_ranger <- (2*precision_ranger*recall_ranger)/sum(precision_ranger,recall_ranger)
+log_loss_ranger <- logLoss(as.numeric(ra_testy), ranger_prob_class1)
+pr_auc_ranger <- PRAUC(ranger_prob_class1,ra_testy)
+
+
+metric_names_ranger <- c( "Recall", "F1 Score","PR-AUC","Accuracy", "Precision","Log Loss")
+metric_values_ranger <- c(recall_ranger, f1_score_ranger,pr_auc_ranger, accuracy_ranger, precision_ranger,log_loss_ranger)
+metrics_df_ranger  <- data.frame(Metric = metric_names_ranger ,Value = metric_values_ranger )
+rownames(metrics_df_ranger ) <- NULL
+
+comparison_df <- cbind( metric_names_ranger,round(metrics_df_xg[, 2],3), round(metrics_df_ranger[, 2],3))
+colnames(comparison_df) <- c("Metric", "XGBoost", "Ranger")
+comparison_tables <- kable(comparison_df, align = "c", format = "html", 
+                          caption = "Model Evaluation Metrics") %>%add_footnote("Positive Class-1 (Not Voting)",notation="none") %>% kable_styling(full_width = 100)%>%column_spec(c(1:3), border_left = TRUE, border_right = TRUE)
+
+comparison_tables
+```
+
+The primary objective is to accurately identify individuals unlikely to participate in voting, which is complicated by an imbalanced class distribution. To address this challenge, metrics such as recall, F1 score, and Precision-Recall Area Under the Curve (PR-AUC) are focused upon. Recall indicates the model's ability to capture instances of the positive class while minimising false negatives. The F1 score, as the harmonic mean of precision and recall, is vital for assessing model performance in imbalanced datasets where high precision and recall are both essential and when comparing models with differing strengths in precision and recall. In datasets with rare positive classes, PR-AUC is more informative than ROC-AUC as it focuses on the precision-recall trade-off.  
+
+In prioritising the accurate identification of non-voters within an imbalanced dataset, XGBoost's higher recall (0.77), F1 score (0.73) and PR-AUC compared to Ranger's metrics position it as a potentially more effective choice.
+
+&nbsp;
+
+#### __Features Selection__  
+
+In the context of budget constraints and dimensionality reduction, feature selection is imperative for maximising model efficacy. SHAP (SHapley Additive exPlanations) quantifies the contribution of each feature to model predictions and can be leveraged for feature selection by prioritising influential predictors based on their impact on model performance.
+
+In the following SHAP plot, the y-axis displays top thirty features arranged by importance, with the mean SHAP value listed alongside: 
+
+```{r, message=FALSE, warning=FALSE,fig.width=10, fig.height=6,echo=FALSE}
+shap_values <- shap.values(xgb_model = xgb_model, X_train = xgb_train)
+shap_long <- shap.prep(xgb_model = xgb_model, shap_contrib = shap_values$shap_score, X_train = train_matrix, top_n = 30)
+shap_plot <- shap.plot.summary(shap_long, x_bound  = 1.2, dilute = 10)
+shap_plot
+```
+
+The report elaborates on selected features; for additional details, please refer to the CCES guidebook.  After studying the questions and considering their SHAP values, seventeen features were shortlisted. This approach aimed at potentially reducing the dimensionality of the dataset while retaining the most significant drivers of model predictions.    
+
+The selected features encompass key themes critical for understanding political and social behavior, including voting behavior, political engagement, demographics, socioeconomic factors, personal beliefs, and immigration status. These features provide insights into electoral participation, levels of political involvement and sentiment, and the broader population's characteristics. They also reveal the economic backgrounds influencing political views and highlight individual value systems and social orientations. Additionally, the inclusion of immigration status allows for examining the perspectives and behaviors of immigrant populations. This comprehensive framework enables a nuanced analysis of the diverse factors shaping political attitudes and actions. Following table enlists the selected features:  
+
+```{r,message=FALSE,warning=FALSE, echo=FALSE}
+variables <- c("presvote20post", "votereg", "votereg_f", "newsint", "age", 
+               "CC22_320", "investor", "pid3", "CC22_307", "gender4", 
+               "region", "pew_religimp", "healthins", "educ", "immstat", "CC22_300d","CC22_36799")
+
+descriptions <- c("2020 Presidential Election Voting Decision",
+                  "Are you registered voter?",
+                  "Is your current zip your voter registration address?",
+                  "Do you keep up with politics and public affairs?",
+                  "Age",
+                  "Approval of various political entities (e.g., Joe Biden, Congress).",
+                  "Do you invest in stocks?",
+                  "Which political party do you align with?",
+                  "How do police make you feel?",
+                  "Gender",
+                  "Residential census region",
+                  "How important is religion to you?",
+                  "Do you have health insurance?",
+                  "Highest level of education",
+                  "Immigration status details",
+                  "Political activity on social media in the last day",
+                  "Did not vote for U.S. House of Representatives")
+
+# Create a data frame
+selected_variables <- data.frame(Features = variables, Description = descriptions)
+
+feat_sel <- kable(selected_variables, align = "c", format = "html", 
+     caption = "Selected Features and Description") %>%
+  kable_styling(full_width = FALSE) %>%
+  column_spec(c(1, 2), border_left = TRUE, border_right = TRUE)
+feat_sel
+
+```
+
+&nbsp;
+
+#### __Final Model Performance__  
+The model,post tuning, was then re-trained on the selected features to optimise both resource allocation and model performance and following are its results:
+
+```{r,message=FALSE,warning=FALSE, echo=FALSE}
+# EXTRACTING FEATURES
+tf_colnames <- c("presvote20post", "votereg", "newsint", "age$", "CC22_320", "CC22_36799", "investor", "pid3", "CC22_307", "gender4", "region", "pew_religimp", "healthins", "educ", "votereg_f", "immstat", "CC22_300d")
+
+tf_train <- ra_trainx[, grep(paste(tf_colnames, collapse="|"), names(ra_trainx))]
+tf_test <- ra_testx[, names(tf_train)]
+
+xgb_top_train <- xgb.DMatrix(data = as.matrix(tf_train), label = ra_trainy)
+xgb_top_test <- xgb.DMatrix(data = as.matrix(tf_test), label = ra_testy)
+
+#write.csv(tf_train,"tf_train.csv")
+#write.csv(tf_test,"tf_test.csv")
+
+xgb_best_params <- list(
+  objective = "binary:logistic",
+  eval_metric = "auc",
+  eta = 0.01,
+  max_depth = 3,
+  min_child_weight = 4,
+  gamma = 0,
+  subsample = 0.5,
+  colsample_bytree = 0.4,
+  reg_alpha = 1e-5,
+  reg_lambda=0.01,
+  nthread = 6,
+  scale_pos_weight = ratio)
+
+#Saving the XGB Model
+#xgb_best_model <-xgb.train(
+  #params = xgb_best_params,
+  #data = xgb_top_train,
+  #verbose = 1,
+  #nrounds = 5000,
+  #set.seed(123))
+
+#xgb.save(xgb_best_model, 'xgb_topf.model')
+
+
+xgb_b_model <- xgb.load("C:/Users/sneha/OneDrive/Desktop/Applied ML/Assessments/Assignment/xgb_topf.model")
+
+tf_result <- predict(xgb_b_model, xgb_top_test)
+xgb_pred_tf <- ifelse(tf_result>0.5,1,0)
+b_tf <- confusionMatrix(as.factor(xgb_pred_tf),as.factor(ra_testy), positive = "1")
+accuracy_tf <- (b_tf$overall["Accuracy"])
+precision_tf <- (b_tf$byClass["Pos Pred Value"])
+recall_tf <- (b_tf$byClass["Sensitivity"])
+f1_score_tf <- (2*precision_tf*recall_tf)/sum(precision_tf,recall_tf)
+log_loss_tf <- logLoss(as.numeric(test_y), as.numeric(tf_result))
+pr_auc_tf <- PRAUC(tf_result,test_y)
+
+
+#Evaluation Metrics: Visualisation
+metric_names <- c("Recall", "F1 Score","PR-AUC","Accuracy", "Precision", "Log Loss")
+metric_values <- c(recall_tf,f1_score_tf,pr_auc_tf,accuracy_tf,precision_tf,log_loss_tf)
+metrics_df <- data.frame(Metric = metric_names,
+                         Value = metric_values)
+rownames(metrics_df) <- NULL
+
+tf_table <- kable(metrics_df, format = "html", 
+                  caption = "Evaluation Metrics(XGBOOST with Feature Selection )") %>%
+  kable_styling(full_width = FALSE, 
+                latex_options = "striped", 
+                bootstrap_options = c("striped", "hover", "condensed", "responsive"), # Bootstrap styling options
+                font_size = 14) %>%
+  add_footnote("Positive Class-1 (Not Voting)",notation="none") %>% 
+  column_spec(c(1:2), border_left = TRUE, border_right = TRUE)
+tf_table
+```
+
+Although other metrics experienced marginal decreases, the noteworthy rise in recall from 0.76 to 0.8197058 for the feature-selected model underscores its strengthened capability to detect non-voters accurately. This improvement suggests that the chosen features better align with the prediction objective, ultimately enhancing the model's performance in identifying individuals who are not going to vote.
+
+&nbsp;
+
+#### __Conclusion__  
+
+This study aimed to develop a predictive model for individual voter turnout in the upcoming November presidential election in the United States using machine learning techniques. Data from the Harvard Cooperative Congressional Election Study (CCES) was leveraged to identify segments of the electorate less likely to participate in elections, crucial for targeted outreach efforts to enhance voter turnout and ensure representative election outcomes.  
+
+Machine learning techniques such as XGBoost and Ranger were pivotal in this study for their ability to handle large, complex datasets and address class imbalance. They demonstrated scalability, robustness, and the ability to process high-dimensional data, thereby enhancing the precision of voter behavior predictions.The findings underscored the superiority of the XGBoost model following meticulous hyperparameter tuning and feature selection, as evidenced by superior metrics such as recall, F1 score, and PR-AUC compared to Ranger.  
+
+Implications of this study extend beyond academic discourse, offering practical insights for policymakers and electoral strategists. By leveraging predictive analytics to discern patterns in voter behavior, targeted outreach efforts can be tailored to encourage broader civic engagement and ensure more inclusive democratic representation. This approach not only optimizes resource allocation but also promotes a more responsive electoral process that reflects diverse societal perspectives and priorities.  
+
+While this research leveraged sophisticated machine learning techniques to extract predictive insights, it acknowledges inherent limitations such as potential biases in survey data and the contextual specificity of electoral dynamics. Future endeavors should focus on refining models and expanding datasets to enhance the generalizability and robustness of predictive analytics in electoral forecasting.
+
+&nbsp;
+
+#### __REFERENCE__  
+Schaffner, B., Ansolabehere, S., & Shih, M. (2023). Cooperative Election Study Common Content, 2022 (Version V4). Harvard Dataverse. https://doi.org/10.7910/DVN/PR4L8P  
+
+&nbsp;
+
+#### __APPENDIX__  
+&nbsp;
+
+##### __Appendix 1: Performance Metrics Results__
+
+__1. XGBOOST__
+
+```{r,message=FALSE,warning=FALSE, echo=FALSE}
+conf_mat_xg
+```
+
+__2. RANGER__
+
+```{r,message=FALSE,warning=FALSE, echo=FALSE}
+conf_mat_ranger
+```
+
+__3. XGBOOST with FEATURES SELECTION__  
+
+```{r,message=FALSE,warning=FALSE, echo=FALSE}
+
+b_tf 
+```
+
+&nbsp;
+
+#### __Appendix 2: XGBOOST MODEL SPECIFICATIONS__  
+Hyperparameter tuning specifications after features were selected:
+
+```{r}
+xgb_best_params <- list(
+  objective = "binary:logistic",
+  eval_metric = "auc",
+  eta = 0.01,
+  max_depth = 3,
+  min_child_weight = 4,
+  gamma = 0,
+  subsample = 0.5,
+  colsample_bytree = 0.4,
+  reg_alpha = 1e-5,
+  reg_lambda=0.01,
+  nthread = 6,
+  scale_pos_weight = ratio)
+
+```
+
+&nbsp;
+
+
+#### __Appendix 3: Code__
+
+```{r ref.label=knitr::all_labels(), echo=TRUE, eval=FALSE} 
+# this chunk generates the complete code appendix. 
+# eval=FALSE tells R not to run (``evaluate'') the code here (it was already run before).
+
+```
