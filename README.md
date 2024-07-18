@@ -1,6 +1,6 @@
 # Predictive Modeling for Voter Turnout in the US Presidential Elections 2024 
 ![Alt Text](ELECTION.webp)
-##### Image Source:naem021/Big Stock Photo
+####### Image Source:naem021/Big Stock Photo
 
 # Summary
 The objective of this project is to construct a robust predictive model for individual voter turnout in the upcoming November US presidential election, leveraging data sourced from the Cooperative Election Study (CCES). This endeavor aims to accurately forecast whether voters will participate in the election, facilitating targeted outreach initiatives by a non-partisan advocacy group to increase voter turnout among less-engaged demographics. Employing advanced machine learning techniques such as XGBoost and Ranger, the study addressed inherent challenges such as imbalanced data and the intricate characteristics of the dataset. Key methodologies included preprocessing the dataset using Multiple Imputation by Chained Equations (MICE) to handle missing data effectively, and employing SHAP analysis to select relevant features critical for model prediction and interpretation.
