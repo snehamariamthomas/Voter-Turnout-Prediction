@@ -7,7 +7,9 @@ This project aimed to predict voter turnout in the upcoming US presidential elec
 
 The evaluation of algorithms focused on practical metrics like recall, F1 score, and Precision-Recall Area Under the Curve (PR-AUC), emphasizing the models' ability to accurately predict non-voters. XGBoost, after rigorous tuning, emerged with a recall of 0.82 and PR-AUC of 0.83, showcasing its effectiveness in identifying individuals less likely to vote.
 
-These findings highlight the significance of precise voter turnout predictions for targeted civic engagement strategies. By integrating demographic weights and optimizing feature selection, the model provided robust insights into voter behavior, essential for enhancing democratic participation and representation.This study demonstrates the practical application of machine learning in electoral forecasting, paving the way for more informed decision-making in electoral campaigns and policy initiatives aimed at increasing voter engagement. Future research could expand on these methods to improve predictive accuracy across diverse electoral contexts and demographic groups.
+These findings highlight the significance of precise voter turnout predictions for targeted civic engagement strategies. By integrating demographic weights and optimizing feature selection, the model provided robust insights into voter behavior, essential for enhancing democratic participation and representation.
+
+This study demonstrates the practical application of machine learning in electoral forecasting, paving the way for more informed decision-making in electoral campaigns and policy initiatives aimed at increasing voter engagement. Future research could expand on these methods to improve predictive accuracy across diverse electoral contexts and demographic groups.
 
 # Technical Skills and Tools
 | Aspect                   | Details                                                                                                                                                          |
